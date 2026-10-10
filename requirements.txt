@@ -2,3 +2,4 @@ neonize
 yt-dlp
 flask
 gunicorn
+qrcode-terminal
