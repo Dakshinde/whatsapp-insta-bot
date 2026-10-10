@@ -120,6 +120,19 @@ def on_message(client: NewClient, event: MessageEv) -> None:
             except Exception:
                 logger.exception("Failed to send error message.")
 
+@client.event(QREv)
+def on_qr(client: NewClient, event: QREv) -> None:
+    global latest_qr_image
+    # Safely extract QR string
+    qr_data = event.QR.decode("utf-8") if isinstance(event.QR, bytes) else str(event.QR)
+    
+    # Generate QR code image
+    img = qrcode.make(qr_data)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    latest_qr_image = buf.getvalue()
+    logger.info(">>> NEW QR CODE GENERATED! Open /qr in your browser to scan. <<<")
+
 # ---------------- START BOT & WEB SERVER ----------------
 if __name__ == "__main__":
     web_thread = threading.Thread(target=run_web)
