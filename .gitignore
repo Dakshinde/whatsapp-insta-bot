@@ -1,0 +1,12 @@
+# Ignore local WhatsApp session database
+whatsapp_session.db
+whatsapp_session.db-journal
+
+# Ignore Python cache and virtual environments
+__pycache__/
+.venv/
+*.pyc
+
+# Ignore temporary downloaded videos
+ig_video_*/
+*.mp4
