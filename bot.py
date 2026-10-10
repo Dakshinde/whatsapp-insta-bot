@@ -95,6 +95,16 @@ def on_message(client: NewClient, event: MessageEv) -> None:
             except Exception:
                 logger.exception("Failed to send error message.")
 
+from neonize.events import QREv
+
+@client.event(QREv)
+def on_qr(client: NewClient, event: QREv) -> None:
+    import qrcode_terminal
+    # Handle both string or raw bytes QR code data safely
+    qr_data = event.QR.decode("utf-8") if isinstance(event.QR, bytes) else str(event.QR)
+    qrcode_terminal.draw(qr_data)
+    logger.info("Scan the QR code above with WhatsApp.")
+
 # ---------------- START BOT & WEB SERVER ----------------
 if __name__ == "__main__":
     # Start Flask web server in a background thread so Render passes health checks
