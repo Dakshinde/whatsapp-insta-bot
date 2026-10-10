@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import re
@@ -5,10 +6,11 @@ import tempfile
 import threading
 from pathlib import Path
 import yt_dlp
-from flask import Flask
+from flask import Flask, send_file
 from neonize import extract_text
 from neonize.client import NewClient
-from neonize.events import ConnectedEv, MessageEv
+from neonize.events import ConnectedEv, MessageEv, QREv
+import qrcode
 
 # ---------------- CONFIGURATION ----------------
 SESSION_FILE = "whatsapp_session.db"
@@ -21,16 +23,39 @@ logger = logging.getLogger(__name__)
 client = NewClient(SESSION_FILE)
 INSTAGRAM_URL_RE = re.compile(r"https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+/?", re.IGNORECASE)
 
-# ---------------- DUMMY WEB SERVER FOR RENDER ----------------
+# Global variable to hold the latest QR code bytes for web display
+latest_qr_image = None
+
+# ---------------- FLASK WEB SERVER & QR ROUTE ----------------
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "WhatsApp Bot is running!"
+    return "WhatsApp Bot is running! Go to <a href='/qr'>/qr</a> to scan the login code if needed."
+
+@app.route("/qr")
+def show_qr():
+    global latest_qr_image
+    if latest_qr_image is None:
+        return "No QR code needed right now (either already connected or waiting for event)."
+    return send_file(io.BytesIO(latest_qr_image), mimetype='image/png')
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
+# ---------------- QR CODE CAPTURE ----------------
+@client.event(QREv)
+def on_qr(client: NewClient, event: QREv) -> None:
+    global latest_qr_image
+    qr_data = event.QR.decode("utf-8") if isinstance(event.QR, bytes) else str(event.QR)
+    
+    # Generate QR code as a PNG image in memory
+    img = qrcode.make(qr_data)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    latest_qr_image = buf.getvalue()
+    logger.info("New QR code generated and available at /qr endpoint.")
 
 # ---------------- VIDEO DOWNLOADER ----------------
 def download_video(url: str, output_dir: Path) -> Path:
@@ -95,19 +120,8 @@ def on_message(client: NewClient, event: MessageEv) -> None:
             except Exception:
                 logger.exception("Failed to send error message.")
 
-from neonize.events import QREv
-
-@client.event(QREv)
-def on_qr(client: NewClient, event: QREv) -> None:
-    import qrcode_terminal
-    # Handle both string or raw bytes QR code data safely
-    qr_data = event.QR.decode("utf-8") if isinstance(event.QR, bytes) else str(event.QR)
-    qrcode_terminal.draw(qr_data)
-    logger.info("Scan the QR code above with WhatsApp.")
-
 # ---------------- START BOT & WEB SERVER ----------------
 if __name__ == "__main__":
-    # Start Flask web server in a background thread so Render passes health checks
     web_thread = threading.Thread(target=run_web)
     web_thread.daemon = True
     web_thread.start()

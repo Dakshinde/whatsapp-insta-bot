@@ -3,3 +3,4 @@ yt-dlp
 flask
 gunicorn
 qrcode-terminal
+qrcode[pil]
